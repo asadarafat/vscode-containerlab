@@ -123,6 +123,8 @@ export class TopoViewer {
     const jsonFileUriDataEnvironment = vscode.Uri.joinPath(mediaPath, 'environment.json');
     const jsonFileUrlDataEnvironment = panel.webview.asWebviewUri(jsonFileUriDataEnvironment).toString();
 
+    const isVscodeDeployment = true;
+
     log.info(`Webview JSON => dataCytoMarshall: ${jsonFileUrlDataCytoMarshall}`);
     log.info(`Webview JSON => environment: ${jsonFileUrlDataEnvironment}`);
 
@@ -133,6 +135,7 @@ export class TopoViewer {
       images,
       jsonFileUrlDataCytoMarshall,
       jsonFileUrlDataEnvironment,
+      isVscodeDeployment,
       jsOutDir  // Path to compiled JS files
     );
 
@@ -223,8 +226,10 @@ export class TopoViewer {
     imagesUri: string,
     jsonFileUrlDataCytoMarshall: string,
     jsonFileUrlDataEnvironment: string,
+    isVscodeDeployment: boolean,
     jsOutDir: string
   ): string {
+        
     return `
       <!DOCTYPE html>
       <html lang="en" id="root">
@@ -1413,7 +1418,9 @@ export class TopoViewer {
             <!-- Inject JSON environment.json as a global variable -->
             <script> window.jsonFileUrlDataEnvironment = "${jsonFileUrlDataEnvironment}"; </script>
 
-
+            <!-- Inject isVscodeDeployment boolean as a global variable -->
+            <script> window.isVscodeDeployment = "${isVscodeDeployment}"; </script>
+            
             <script src="${jsUri}/dev.js?ver=1"></script>
             <script src="${jsUri}/common.js?ver=1"></script>
             <script src="${jsUri}/managerLayoutAlgo.js?ver=1"></script>

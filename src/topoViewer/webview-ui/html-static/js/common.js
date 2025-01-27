@@ -1,5 +1,9 @@
 // reusable commonn functions 
 
+var isVscodeDeployment = Boolean(window.isVscodeDeployment);
+// If window.isVscodeDeployment is undefined:
+// Boolean(undefined) evaluates to false.
+
 async function callGoFunction(goFunctionName, arg01, arg02, arg03) {
 	console.log(`callGoFunction Called with ${goFunctionName}`);
 	console.log(`Parameter01: ${arg01}`);
@@ -58,11 +62,9 @@ async function callGoFunction(goFunctionName, arg01, arg02, arg03) {
  * @returns {Promise<Object|null>} - Returns the environments object or null if an error occurs.
  */
 async function getEnvironments(event) {
-    // Define deployment type using const to prevent reassignment and scope pollution
-    const deploymentType = "vs-code";
 
-    if (deploymentType === "vs-code") {
-        try {
+	if (isVscodeDeployment) {
+         try {
             // Await the fetch call to ensure the promise resolves before proceeding
             const response = await fetch(window.jsonFileUrlDataEnvironment);
 
