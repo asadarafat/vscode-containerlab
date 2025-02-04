@@ -7,5 +7,19 @@
 		"out": true // set this to false to include "out" folder in search results
 	},
 	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-	"typescript.tsc.autoDetect": "off"
+	"typescript.tsc.autoDetect": "off",
+	"json.schemas": [
+		{
+			"fileMatch": [
+				"*.viewConfig"
+			],
+			"schema": false,
+			"url": "file:///Users/aarafat/.vscode/extensions/nokia.nokia-intent-manager-3.2.1/media/viewconfig-schema.json"
+		}
+	],
+	"files.associations": {
+		"/actions/*": "yaml",
+		"/templates/*": "jinja",
+		"/workflows/*": "yaml"
+	}
 }
