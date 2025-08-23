@@ -4,7 +4,7 @@
 // Import logger for webview
 import { log } from '../logging/webviewLogger';
 import { VscodeMessageSender } from './managerVscodeWebview';
-import { exportViewportAsSvg } from './utils';
+import { exportViewportAsDrawio } from './managerSaveTopo';
 import topoViewerState from '../state';
 import { zoomToFitManager } from '../core/managerRegistry';
 import { FilterUtils } from '../../helpers/filterUtils';
@@ -234,7 +234,7 @@ export function viewportDrawerCaptureFunc(event: Event): void {
       return;
     }
     const cy = topoViewerState.cy;
-    exportViewportAsSvg(cy);
+    exportViewportAsDrawio(cy);
   } catch (error) {
     log.error(`Error capturing topology: ${error}`);
   }
@@ -250,8 +250,8 @@ export function viewportButtonsCaptureViewportAsSvg(): void {
       return;
     }
     const cy = topoViewerState.cy;
-    exportViewportAsSvg(cy);
-    log.info('Viewport captured as SVG');
+    exportViewportAsDrawio(cy);
+    log.info('Viewport exported as draw.io');
   } catch (error) {
     log.error(`Error capturing viewport as SVG: ${error}`);
   }

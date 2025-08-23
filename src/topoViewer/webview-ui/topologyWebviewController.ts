@@ -19,7 +19,7 @@ import { ManagerViewportPanels } from './managerViewportPanels';
 import { ManagerUnifiedFloatingPanel } from './managerUnifiedFloatingPanel';
 import { ManagerFreeText } from './managerFreeText';
 import { ManagerGroupStyle } from './managerGroupStyle';
-import { exportViewportAsSvg } from './utils';
+import { exportViewportAsDrawio } from './managerSaveTopo';
 import type { ManagerGroupManagement } from './managerGroupManagement';
 import type { ManagerLayoutAlgo } from './managerLayoutAlgo';
 import type { ManagerZoomToFit } from './managerZoomToFit';
@@ -334,7 +334,7 @@ class TopologyWebviewController {
     // Create capture viewport manager with the required method
     this.captureViewportManager = {
       viewportButtonsCaptureViewportAsSvg: (cy: cytoscape.Core) => {
-        exportViewportAsSvg(cy);
+        exportViewportAsDrawio(cy);
       }
     };
 
