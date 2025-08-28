@@ -23,6 +23,20 @@
           </div>
         </div>
 
+        <!-- Extended Network Details (read-only in this phase) -->
+        <div class="my-1" id="panel-network-editor-details-row" style="display: none;">
+          <div class="p-0.5">
+            <div class="flex items-start">
+              <div class="w-2/5 pr-1">
+                <label class="label text-right text-base font-semibold">Details</label>
+              </div>
+              <div class="w-3/5 pl-2 pr-2">
+                <div id="panel-network-editor-details" class="text-left font-extralight text-sm whitespace-pre-wrap"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Interface -->
         <div class="my-1">
           <div class="p-0.5">
@@ -60,6 +74,7 @@
                 <div class="space-x-2">
                   <button class="btn btn-primary btn-small" id="panel-network-editor-save-button">Save</button>
                   <button class="btn btn-outlined btn-small" id="panel-network-editor-close-button">Close</button>
+                  <div class="text-xs text-yellow-500 mt-1" id="panel-network-editor-ro-note" style="display: none;">Extended network editing will be available in a later phase. Fields are read-only.</div>
                 </div>
               </div>
             </div>

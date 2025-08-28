@@ -753,6 +753,7 @@ export class TopoViewerAdaptorClab {
         let targetIface = '';
         let yamlProvenance: 'short' | 'extended' = 'short';
         let yamlLinkType = '';
+        let yamlLinkInfo: Record<string, any> | undefined = undefined;
 
         if (Array.isArray(linkObj.endpoints) && typeof linkObj.type !== 'string') {
           const endA = linkObj.endpoints?.[0] ?? '';
@@ -781,36 +782,42 @@ export class TopoViewerAdaptorClab {
               const ep = linkObj.endpoint; if (!ep) continue;
               sourceNode = ep.node; sourceIface = ep.interface;
               targetNode = 'mgmt-net'; targetIface = String(linkObj['host-interface'] ?? '');
+              yamlLinkInfo = { 'host-interface': linkObj['host-interface'] ?? '', mtu: linkObj.mtu };
               break;
             }
             case 'host': {
               const ep = linkObj.endpoint; if (!ep) continue;
               sourceNode = ep.node; sourceIface = ep.interface;
               targetNode = 'host'; targetIface = String(linkObj['host-interface'] ?? '');
+              yamlLinkInfo = { 'host-interface': linkObj['host-interface'] ?? '', mtu: linkObj.mtu };
               break;
             }
             case 'macvlan': {
               const ep = linkObj.endpoint; if (!ep) continue;
               sourceNode = ep.node; sourceIface = ep.interface;
               targetNode = `macvlan:${String(linkObj['host-interface'] ?? '')}`; targetIface = '';
+              yamlLinkInfo = { 'host-interface': linkObj['host-interface'] ?? '', mode: linkObj.mode ?? 'bridge' };
               break;
             }
             case 'vxlan': {
               const ep = linkObj.endpoint; if (!ep) continue;
               sourceNode = ep.node; sourceIface = ep.interface;
               targetNode = `vxlan:${linkObj.remote}/${linkObj.vni}`; targetIface = '';
+              yamlLinkInfo = { remote: linkObj.remote, vni: linkObj.vni, 'udp-port': linkObj['udp-port'] };
               break;
             }
             case 'vxlan-stitch': {
               const ep = linkObj.endpoint; if (!ep) continue;
               sourceNode = ep.node; sourceIface = ep.interface;
               targetNode = `vxlan-stitch:${linkObj.remote}/${linkObj.vni}`; targetIface = '';
+              yamlLinkInfo = { remote: linkObj.remote, vni: linkObj.vni, 'udp-port': linkObj['udp-port'] };
               break;
             }
             case 'dummy': {
               const ep = linkObj.endpoint; if (!ep) continue;
               sourceNode = ep.node; sourceIface = ep.interface;
               targetNode = `dummy:${ep.node}:${ep.interface}`; targetIface = '';
+              yamlLinkInfo = {};
               break;
             }
             default:
@@ -927,6 +934,7 @@ export class TopoViewerAdaptorClab {
             topoViewerRole: 'link',
             yamlProvenance,
             yamlLinkType,
+            yamlLinkInfo,
             sourceEndpoint: (sourceNode === 'host' || sourceNode === 'mgmt-net' || sourceNode.startsWith('macvlan:') || sourceNode.startsWith('vxlan:') || sourceNode.startsWith('vxlan-stitch:') || sourceNode.startsWith('dummy:')) ? '' : sourceIface,
             targetEndpoint: (targetNode === 'host' || targetNode === 'mgmt-net' || targetNode.startsWith('macvlan:') || targetNode.startsWith('vxlan:') || targetNode.startsWith('vxlan-stitch:') || targetNode.startsWith('dummy:')) ? '' : targetIface,
             lat: '',

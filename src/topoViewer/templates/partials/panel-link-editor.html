@@ -25,6 +25,34 @@
           </div>
         </div>
 
+        <!-- Extended Link Type (read-only) -->
+        <div class="my-1" id="panel-link-editor-type-row" style="display: none;">
+          <div class="p-0.5">
+            <div class="flex items-center">
+              <div class="w-2/5 pr-1">
+                <label class="label text-right text-base font-semibold">Type</label>
+              </div>
+              <div class="w-3/5 pl-2 pr-2">
+                <div id="panel-link-editor-type" class="text-left font-extralight text-base break-words"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Extended Link Details (read-only) -->
+        <div class="my-1" id="panel-link-editor-details-row" style="display: none;">
+          <div class="p-0.5">
+            <div class="flex items-start">
+              <div class="w-2/5 pr-1">
+                <label class="label text-right text-base font-semibold">Details</label>
+              </div>
+              <div class="w-3/5 pl-2 pr-2">
+                <div id="panel-link-editor-details" class="text-left font-extralight text-sm whitespace-pre-wrap"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Source Endpoint -->
         <div class="my-1">
           <div class="p-0.5">
@@ -56,6 +84,18 @@
                   id="panel-link-editor-target-endpoint"
                   class="input-field w-full text-base font-extralight h-[28px]"
                   placeholder="e.g., eth1, e1-1">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Read-only notice for extended links -->
+        <div class="my-1" id="panel-link-editor-ro-note" style="display: none;">
+          <div class="p-0.5">
+            <div class="flex items-center">
+              <div class="w-2/5 pr-1"></div>
+              <div class="w-3/5 pl-2 pr-2">
+                <div class="text-xs text-yellow-500">Extended link editing will be available in a later phase. Fields are read-only.</div>
               </div>
             </div>
           </div>

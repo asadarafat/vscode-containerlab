@@ -70,7 +70,11 @@ export async function saveViewport({
   const topoObj = mode === 'edit' ? (doc.toJS() as ClabTopology) : undefined;
 
   payloadParsed
-    .filter(el => el.group === 'nodes' && el.data.topoViewerRole !== 'group' && el.data.topoViewerRole !== 'freeText' && !isSpecialEndpoint(el.data.id))
+    .filter(el => el.group === 'nodes'
+      && el.data.topoViewerRole !== 'group'
+      && el.data.topoViewerRole !== 'cloud'
+      && el.data.topoViewerRole !== 'freeText'
+      && !isSpecialEndpoint(el.data.id))
     .forEach(element => {
       const nodeId: string = element.data.id;
       let nodeYaml = yamlNodes.get(nodeId, true) as YAML.YAMLMap | undefined;
@@ -134,7 +138,12 @@ export async function saveViewport({
 
   if (mode === 'edit') {
     const payloadNodeIds = new Set(
-      payloadParsed.filter(el => el.group === 'nodes' && el.data.topoViewerRole !== 'freeText' && !isSpecialEndpoint(el.data.id)).map(el => el.data.id)
+      payloadParsed
+        .filter(el => el.group === 'nodes'
+          && el.data.topoViewerRole !== 'cloud'
+          && el.data.topoViewerRole !== 'freeText'
+          && !isSpecialEndpoint(el.data.id))
+        .map(el => el.data.id)
     );
     for (const item of [...yamlNodes.items]) {
       const keyStr = String(item.key);
@@ -196,12 +205,16 @@ export async function saveViewport({
 
     const payloadEdgeEndpoints = new Set(
       payloadParsed
-        .filter(el => el.group === 'edges')
+        .filter(el => el.group === 'edges' && el.data?.yamlProvenance !== 'extended')
         .map(el => computeEndpointsStr(el.data))
         .filter((s): s is string => Boolean(s))
     );
     linksNode.items = linksNode.items.filter(linkItem => {
       if (YAML.isMap(linkItem)) {
+        // Preserve extended link entries (those having a 'type' key)
+        if ((linkItem as YAML.YAMLMap).has('type')) {
+          return true;
+        }
         const endpointsNode = linkItem.get('endpoints', true);
         if (YAML.isSeq(endpointsNode)) {
           const endpointsStr = endpointsNode.items
@@ -214,26 +227,34 @@ export async function saveViewport({
     });
 
     for (const linkItem of linksNode.items) {
-      if (YAML.isMap(linkItem)) {
-        // Normalize to block style for link entries
-        (linkItem as YAML.YAMLMap).flow = false;
-        const endpointsNode = linkItem.get('endpoints', true);
-        if (YAML.isSeq(endpointsNode)) {
-          endpointsNode.items = endpointsNode.items.map(item => {
-            let endpointStr = String((item as any).value ?? item);
-            if (endpointStr.includes(':')) {
-              const [nodeKey, rest] = endpointStr.split(':');
-              if (updatedKeys.has(nodeKey)) {
-                endpointStr = `${updatedKeys.get(nodeKey)}:${rest}`;
-              }
-            } else if (updatedKeys.has(endpointStr)) {
-              endpointStr = updatedKeys.get(endpointStr)!;
+      if (!YAML.isMap(linkItem)) continue;
+      const linkMap = linkItem as YAML.YAMLMap;
+
+      // Keep extended links intact in this phase (typed links)
+      if (linkMap.has('type')) {
+        // Still ensure link entry uses block style
+        linkMap.flow = false;
+        continue;
+      }
+
+      // Short-form links: update renamed node keys in endpoints strings
+      linkMap.flow = false;
+      const endpointsNode = linkMap.get('endpoints', true);
+      if (YAML.isSeq(endpointsNode)) {
+        endpointsNode.items = endpointsNode.items.map(item => {
+          let endpointStr = String((item as any).value ?? item);
+          if (endpointStr.includes(':')) {
+            const [nodeKey, rest] = endpointStr.split(':');
+            if (updatedKeys.has(nodeKey)) {
+              endpointStr = `${updatedKeys.get(nodeKey)}:${rest}`;
             }
-            return doc.createNode(endpointStr);
-          });
-          // Ensure endpoints list renders inline with []
-          endpointsNode.flow = true;
-        }
+          } else if (updatedKeys.has(endpointStr)) {
+            endpointStr = updatedKeys.get(endpointStr)!;
+          }
+          return doc.createNode(endpointStr);
+        });
+        // Ensure endpoints list renders inline with []
+        (endpointsNode as YAML.YAMLSeq).flow = true;
       }
     }
   }

@@ -94,6 +94,10 @@ export class ManagerSaveTopo {
         const edgeJson: any = edge.json();
 
         if (edgeJson.data) {
+          // Skip extended links in this phase to avoid converting them to short-form
+          if (edgeJson.data.yamlProvenance === 'extended') {
+            return acc;
+          }
           const sourceId = edgeJson.data.source;
           const targetId = edgeJson.data.target;
           const sourceEp = edgeJson.data.sourceEndpoint;

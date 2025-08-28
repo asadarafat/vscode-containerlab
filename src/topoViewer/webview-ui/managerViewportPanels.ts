@@ -260,7 +260,7 @@ export class ManagerViewportPanels {
     }
 
     // Initialize network type filterable dropdown
-    const networkTypeOptions = ['host', 'mgmt-net', 'macvlan', 'bridge', 'ovs-bridge'];
+    const networkTypeOptions = ['host', 'mgmt-net', 'macvlan', 'bridge', 'ovs-bridge', 'vxlan', 'vxlan-stitch', 'dummy'];
     this.createFilterableDropdown(
       'panel-network-type-dropdown-container',
       networkTypeOptions,
@@ -306,8 +306,42 @@ export class ManagerViewportPanels {
       });
     }
 
-    const saveBtn = document.getElementById('panel-network-editor-save-button');
-    if (saveBtn) {
+    // Extended types (vxlan, vxlan-stitch, dummy) are read-only in this phase; show details
+    const detailsRow = document.getElementById('panel-network-editor-details-row') as HTMLElement | null;
+    const detailsEl = document.getElementById('panel-network-editor-details') as HTMLElement | null;
+    const roNote = document.getElementById('panel-network-editor-ro-note') as HTMLElement | null;
+    const saveBtn = document.getElementById('panel-network-editor-save-button') as HTMLButtonElement | null;
+    const typeFilterInput = document.getElementById('panel-network-type-dropdown-container-filter-input') as HTMLInputElement | null;
+
+    const isExtended = networkType === 'vxlan' || networkType === 'vxlan-stitch' || networkType === 'dummy';
+    if (isExtended) {
+      // Find a connected edge and read its yamlLinkInfo for details
+      const connectedEdge = node.connectedEdges().first();
+      const info = (connectedEdge && connectedEdge.length > 0) ? (connectedEdge.data('yamlLinkInfo') as Record<string, any> | undefined) : undefined;
+      const lines: string[] = [];
+      if (info && typeof info === 'object') {
+        Object.entries(info).forEach(([k, v]) => {
+          if (v !== undefined && v !== '') lines.push(`${k}: ${v}`);
+        });
+      }
+      if (detailsRow && detailsEl) {
+        detailsRow.style.display = 'block';
+        detailsEl.textContent = lines.length ? lines.join('\n') : '—';
+      }
+      if (roNote) roNote.style.display = 'block';
+      // Disable editing controls
+      if (saveBtn) saveBtn.disabled = true;
+      if (typeFilterInput) typeFilterInput.disabled = true;
+      if (interfaceInput) interfaceInput.disabled = true;
+    } else {
+      if (detailsRow) detailsRow.style.display = 'none';
+      if (roNote) roNote.style.display = 'none';
+      if (saveBtn) saveBtn.disabled = false;
+      if (typeFilterInput) typeFilterInput.disabled = false;
+      if (interfaceInput) interfaceInput.disabled = false;
+    }
+
+    if (saveBtn && !isExtended) {
       const newSaveBtn = saveBtn.cloneNode(true) as HTMLElement;
       saveBtn.parentNode?.replaceChild(newSaveBtn, saveBtn);
       newSaveBtn.addEventListener('click', async () => {
@@ -353,6 +387,8 @@ export class ManagerViewportPanels {
       const target = edge.data("target") as string;
       const sourceEP = (edge.data("sourceEndpoint") as string) || "";
       const targetEP = (edge.data("targetEndpoint") as string) || "";
+      const yamlProvenance = (edge.data('yamlProvenance') as string) || '';
+      const yamlLinkType = (edge.data('yamlLinkType') as string) || '';
 
       // Populate inputs with current endpoint values
       panelLinkEditorIdLabelSrcInput.value = sourceEP;
@@ -373,6 +409,30 @@ export class ManagerViewportPanels {
       // 3) Show the panel
       panelLinkEditor.style.display = "block";
 
+      // 3a) Extended link handling (read-only in this phase)
+      const typeRow = document.getElementById('panel-link-editor-type-row') as HTMLElement | null;
+      const detailsRow = document.getElementById('panel-link-editor-details-row') as HTMLElement | null;
+      const roNote = document.getElementById('panel-link-editor-ro-note') as HTMLElement | null;
+
+      const isExtended = yamlProvenance === 'extended' && yamlLinkType && yamlLinkType !== 'short';
+      if (isExtended) {
+        // For extended links, show a read-only note and defer details to the Network Properties panel
+        if (typeRow) typeRow.style.display = 'none';
+        if (detailsRow) detailsRow.style.display = 'none';
+        if (roNote) roNote.style.display = 'block';
+
+        // Disable inputs and save button
+        panelLinkEditorIdLabelSrcInput.disabled = true;
+        panelLinkEditorIdLabelTgtInput.disabled = true;
+      } else {
+        // Hide extended-only UI for short links
+        if (typeRow) typeRow.style.display = 'none';
+        if (detailsRow) detailsRow.style.display = 'none';
+        if (roNote) roNote.style.display = 'none';
+        panelLinkEditorIdLabelSrcInput.disabled = false;
+        panelLinkEditorIdLabelTgtInput.disabled = false;
+      }
+
       // 4) Re-wire Close button (one-shot)
       const freshClose = panelLinkEditorIdLabelCloseBtn.cloneNode(true) as HTMLElement;
       panelLinkEditorIdLabelCloseBtn.parentNode!.replaceChild(freshClose, panelLinkEditorIdLabelCloseBtn);
@@ -390,9 +450,21 @@ export class ManagerViewportPanels {
         const freshSave = panelLinkEditorIdLabelSaveBtn.cloneNode(true) as HTMLElement;
         panelLinkEditorIdLabelSaveBtn.parentNode?.replaceChild(freshSave, panelLinkEditorIdLabelSaveBtn);
 
+        // Disable save for extended links in this phase
+        if (isExtended) {
+          (freshSave as HTMLButtonElement).disabled = true;
+          freshSave.classList.add('btn-disabled');
+        }
+
         freshSave.addEventListener(
           "click",
           async () => {
+            if (isExtended) {
+              // No-op for extended links in this phase
+              panelLinkEditor.style.display = "none";
+              this.edgeClicked = false;
+              return;
+            }
             try {
               // 6a) Update edge data from inputs
               const newSourceEP = panelLinkEditorIdLabelSrcInput.value.trim();
