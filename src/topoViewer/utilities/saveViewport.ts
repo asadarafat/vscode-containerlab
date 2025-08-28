@@ -229,16 +229,46 @@ export async function saveViewport({
     for (const linkItem of linksNode.items) {
       if (!YAML.isMap(linkItem)) continue;
       const linkMap = linkItem as YAML.YAMLMap;
+      // Always use block style for link entry
+      linkMap.flow = false;
 
-      // Keep extended links intact in this phase (typed links)
+      // Extended links: update endpoint node names on rename, preserve structure
       if (linkMap.has('type')) {
-        // Still ensure link entry uses block style
-        linkMap.flow = false;
+        const typeNode = linkMap.get('type', true) as any;
+        const typeStr = String(typeNode?.value ?? typeNode ?? '');
+
+        if (typeStr === 'veth') {
+          const eps = linkMap.get('endpoints', true);
+          if (YAML.isSeq(eps)) {
+            eps.items = eps.items.map(epItem => {
+              if (YAML.isMap(epItem)) {
+                const epMap = epItem as YAML.YAMLMap;
+                const nodeScalar = epMap.get('node', true) as any;
+                const nodeVal = String(nodeScalar?.value ?? nodeScalar ?? '');
+                if (updatedKeys.has(nodeVal)) {
+                  epMap.set('node', doc.createNode(updatedKeys.get(nodeVal)));
+                }
+                return epMap;
+              }
+              return epItem;
+            });
+          }
+        } else {
+          const ep = linkMap.get('endpoint', true);
+          if (YAML.isMap(ep)) {
+            const epMap = ep as YAML.YAMLMap;
+            const nodeScalar = epMap.get('node', true) as any;
+            const nodeVal = String(nodeScalar?.value ?? nodeScalar ?? '');
+            if (updatedKeys.has(nodeVal)) {
+              epMap.set('node', doc.createNode(updatedKeys.get(nodeVal)));
+            }
+          }
+        }
+        // done with extended link
         continue;
       }
 
       // Short-form links: update renamed node keys in endpoints strings
-      linkMap.flow = false;
       const endpointsNode = linkMap.get('endpoints', true);
       if (YAML.isSeq(endpointsNode)) {
         endpointsNode.items = endpointsNode.items.map(item => {
