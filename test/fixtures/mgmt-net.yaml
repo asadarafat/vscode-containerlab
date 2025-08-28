@@ -1,0 +1,12 @@
+name: mgmt-net
+topology:
+  nodes:
+    n1: { kind: linux }
+  links:
+    - type: mgmt-net
+      endpoint:
+        node: n1
+        interface: eth1
+      host-interface: br-mgmt
+      mtu: 1500
+

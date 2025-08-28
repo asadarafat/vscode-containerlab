@@ -1,0 +1,12 @@
+name: macvlan
+topology:
+  nodes:
+    n1: { kind: linux }
+  links:
+    - type: macvlan
+      endpoint:
+        node: n1
+        interface: eth1
+      host-interface: eth0
+      mode: bridge
+

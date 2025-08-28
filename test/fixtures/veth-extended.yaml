@@ -1,0 +1,16 @@
+name: veth-extended
+topology:
+  nodes:
+    n1: { kind: linux }
+    n2: { kind: linux }
+  links:
+    - type: veth
+      endpoints:
+        - node: n1
+          interface: eth1
+        - node: n2
+          interface: eth1
+      mtu: 1500
+      labels:
+        test: veth
+

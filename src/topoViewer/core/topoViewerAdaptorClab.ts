@@ -447,7 +447,7 @@ export class TopoViewerAdaptorClab {
     opts: { includeContainerData: boolean; clabTreeData?: Record<string, ClabLabTreeNode>; annotations?: any }
   ): CyElement[] {
     const elements: CyElement[] = [];
-    const specialNodes = new Map<string, { type: 'host' | 'mgmt-net' | 'macvlan' | 'bridge' | 'ovs-bridge'; label: string }>();
+    const specialNodes = new Map<string, { type: 'host' | 'mgmt-net' | 'macvlan' | 'vxlan' | 'vxlan-stitch' | 'dummy' | 'bridge' | 'ovs-bridge'; label: string }>();
 
     if (!parsed.topology) {
       log.warn('Parsed YAML does not contain \x27topology\x27 object.');
@@ -610,38 +610,73 @@ export class TopoViewerAdaptorClab {
 
     let linkIndex = 0;
     if (parsed.topology.links) {
-      // First pass: identify special endpoints
-      for (const linkObj of parsed.topology.links) {
-        const endA = linkObj.endpoints?.[0] ?? '';
-        const endB = linkObj.endpoints?.[1] ?? '';
-        if (!endA || !endB) {
-          continue;
-        }
-
-        const { node: nodeA } = this.splitEndpoint(endA);
-        const { node: nodeB } = this.splitEndpoint(endB);
-
-        // Check for special nodes
-        if (nodeA === 'host') {
-          const { iface: ifaceA } = this.splitEndpoint(endA);
-          specialNodes.set(`host:${ifaceA}`, { type: 'host', label: `host:${ifaceA || 'host'}` });
-        } else if (nodeA === 'mgmt-net') {
-          const { iface: ifaceA } = this.splitEndpoint(endA);
-          specialNodes.set(`mgmt-net:${ifaceA}`, { type: 'mgmt-net', label: `mgmt-net:${ifaceA || 'mgmt-net'}` });
-        } else if (nodeA.startsWith('macvlan:')) {
-          const macvlanIface = nodeA.substring(8);
-          specialNodes.set(nodeA, { type: 'macvlan', label: `macvlan:${macvlanIface}` });
-        }
-
-        if (nodeB === 'host') {
-          const { iface: ifaceB } = this.splitEndpoint(endB);
-          specialNodes.set(`host:${ifaceB}`, { type: 'host', label: `host:${ifaceB || 'host'}` });
-        } else if (nodeB === 'mgmt-net') {
-          const { iface: ifaceB } = this.splitEndpoint(endB);
-          specialNodes.set(`mgmt-net:${ifaceB}`, { type: 'mgmt-net', label: `mgmt-net:${ifaceB || 'mgmt-net'}` });
-        } else if (nodeB.startsWith('macvlan:')) {
-          const macvlanIface = nodeB.substring(8);
-          specialNodes.set(nodeB, { type: 'macvlan', label: `macvlan:${macvlanIface}` });
+      // First pass: identify special endpoints (short and extended)
+      for (const linkObjAny of parsed.topology.links as any[]) {
+        const linkObj = linkObjAny || {};
+        if (Array.isArray(linkObj.endpoints) && typeof linkObj.type !== 'string') {
+          // Short-form
+          const endA = linkObj.endpoints?.[0] ?? '';
+          const endB = linkObj.endpoints?.[1] ?? '';
+          if (!endA || !endB) continue;
+          const { node: nodeA } = this.splitEndpoint(endA);
+          const { node: nodeB } = this.splitEndpoint(endB);
+          if (nodeA === 'host') {
+            const { iface: ifaceA } = this.splitEndpoint(endA);
+            specialNodes.set(`host:${ifaceA}`, { type: 'host', label: `host:${ifaceA || 'host'}` });
+          } else if (nodeA === 'mgmt-net') {
+            const { iface: ifaceA } = this.splitEndpoint(endA);
+            specialNodes.set(`mgmt-net:${ifaceA}`, { type: 'mgmt-net', label: `mgmt-net:${ifaceA || 'mgmt-net'}` });
+          } else if (nodeA.startsWith('macvlan:')) {
+            const macvlanIface = nodeA.substring(8);
+            specialNodes.set(nodeA, { type: 'macvlan', label: `macvlan:${macvlanIface}` });
+          }
+          if (nodeB === 'host') {
+            const { iface: ifaceB } = this.splitEndpoint(endB);
+            specialNodes.set(`host:${ifaceB}`, { type: 'host', label: `host:${ifaceB || 'host'}` });
+          } else if (nodeB === 'mgmt-net') {
+            const { iface: ifaceB } = this.splitEndpoint(endB);
+            specialNodes.set(`mgmt-net:${ifaceB}`, { type: 'mgmt-net', label: `mgmt-net:${ifaceB || 'mgmt-net'}` });
+          } else if (nodeB.startsWith('macvlan:')) {
+            const macvlanIface = nodeB.substring(8);
+            specialNodes.set(nodeB, { type: 'macvlan', label: `macvlan:${macvlanIface}` });
+          }
+        } else if (typeof linkObj.type === 'string') {
+          // Extended
+          switch (linkObj.type) {
+            case 'mgmt-net': {
+              const hi = linkObj['host-interface'];
+              if (hi) specialNodes.set(`mgmt-net:${hi}`, { type: 'mgmt-net', label: `mgmt-net:${hi}` });
+              break;
+            }
+            case 'host': {
+              const hi = linkObj['host-interface'];
+              if (hi) specialNodes.set(`host:${hi}`, { type: 'host', label: `host:${hi}` });
+              break;
+            }
+            case 'macvlan': {
+              const hi = linkObj['host-interface'];
+              if (hi) specialNodes.set(`macvlan:${hi}`, { type: 'macvlan', label: `macvlan:${hi}` });
+              break;
+            }
+            case 'vxlan': {
+              const id = `vxlan:${linkObj.remote}/${linkObj.vni}`;
+              specialNodes.set(id, { type: 'vxlan', label: id });
+              break;
+            }
+            case 'vxlan-stitch': {
+              const id = `vxlan-stitch:${linkObj.remote}/${linkObj.vni}`;
+              specialNodes.set(id, { type: 'vxlan-stitch', label: id });
+              break;
+            }
+            case 'dummy': {
+              const ep = linkObj.endpoint;
+              if (ep?.node && ep?.interface) {
+                const id = `dummy:${ep.node}:${ep.interface}`;
+                specialNodes.set(id, { type: 'dummy', label: `dummy:${ep.interface}` });
+              }
+              break;
+            }
+          }
         }
       }
 
@@ -710,16 +745,80 @@ export class TopoViewerAdaptorClab {
       }
 
       // Second pass: create edges
-      for (const linkObj of parsed.topology.links) {
-        const endA = linkObj.endpoints?.[0] ?? '';
-        const endB = linkObj.endpoints?.[1] ?? '';
-        if (!endA || !endB) {
-          log.warn('Link does not have both endpoints. Skipping.');
+      for (const linkObjAny of parsed.topology.links as any[]) {
+        const linkObj = linkObjAny || {};
+        let sourceNode = '';
+        let targetNode = '';
+        let sourceIface = '';
+        let targetIface = '';
+        let yamlProvenance: 'short' | 'extended' = 'short';
+        let yamlLinkType = '';
+
+        if (Array.isArray(linkObj.endpoints) && typeof linkObj.type !== 'string') {
+          const endA = linkObj.endpoints?.[0] ?? '';
+          const endB = linkObj.endpoints?.[1] ?? '';
+          if (!endA || !endB) {
+            log.warn('Link does not have both endpoints. Skipping.');
+            continue;
+          }
+          ({ node: sourceNode, iface: sourceIface } = this.splitEndpoint(endA));
+          ({ node: targetNode, iface: targetIface } = this.splitEndpoint(endB));
+          yamlProvenance = 'short';
+          yamlLinkType = 'short';
+        } else if (typeof linkObj.type === 'string') {
+          yamlProvenance = 'extended';
+          yamlLinkType = linkObj.type;
+          switch (linkObj.type) {
+            case 'veth': {
+              const epA = linkObj.endpoints?.[0];
+              const epB = linkObj.endpoints?.[1];
+              if (!epA || !epB) continue;
+              sourceNode = epA.node; sourceIface = epA.interface;
+              targetNode = epB.node; targetIface = epB.interface;
+              break;
+            }
+            case 'mgmt-net': {
+              const ep = linkObj.endpoint; if (!ep) continue;
+              sourceNode = ep.node; sourceIface = ep.interface;
+              targetNode = 'mgmt-net'; targetIface = String(linkObj['host-interface'] ?? '');
+              break;
+            }
+            case 'host': {
+              const ep = linkObj.endpoint; if (!ep) continue;
+              sourceNode = ep.node; sourceIface = ep.interface;
+              targetNode = 'host'; targetIface = String(linkObj['host-interface'] ?? '');
+              break;
+            }
+            case 'macvlan': {
+              const ep = linkObj.endpoint; if (!ep) continue;
+              sourceNode = ep.node; sourceIface = ep.interface;
+              targetNode = `macvlan:${String(linkObj['host-interface'] ?? '')}`; targetIface = '';
+              break;
+            }
+            case 'vxlan': {
+              const ep = linkObj.endpoint; if (!ep) continue;
+              sourceNode = ep.node; sourceIface = ep.interface;
+              targetNode = `vxlan:${linkObj.remote}/${linkObj.vni}`; targetIface = '';
+              break;
+            }
+            case 'vxlan-stitch': {
+              const ep = linkObj.endpoint; if (!ep) continue;
+              sourceNode = ep.node; sourceIface = ep.interface;
+              targetNode = `vxlan-stitch:${linkObj.remote}/${linkObj.vni}`; targetIface = '';
+              break;
+            }
+            case 'dummy': {
+              const ep = linkObj.endpoint; if (!ep) continue;
+              sourceNode = ep.node; sourceIface = ep.interface;
+              targetNode = `dummy:${ep.node}:${ep.interface}`; targetIface = '';
+              break;
+            }
+            default:
+              continue;
+          }
+        } else {
           continue;
         }
-
-        const { node: sourceNode, iface: sourceIface } = this.splitEndpoint(endA);
-        const { node: targetNode, iface: targetIface } = this.splitEndpoint(endB);
 
         // Handle special endpoints
         let actualSourceNode = sourceNode;
@@ -729,7 +828,7 @@ export class TopoViewerAdaptorClab {
           actualSourceNode = `host:${sourceIface}`;
         } else if (sourceNode === 'mgmt-net') {
           actualSourceNode = `mgmt-net:${sourceIface}`;
-        } else if (sourceNode.startsWith('macvlan:')) {
+        } else if (sourceNode.startsWith('macvlan:') || sourceNode.startsWith('vxlan:') || sourceNode.startsWith('vxlan-stitch:') || sourceNode.startsWith('dummy:')) {
           actualSourceNode = sourceNode;
         }
 
@@ -737,14 +836,14 @@ export class TopoViewerAdaptorClab {
           actualTargetNode = `host:${targetIface}`;
         } else if (targetNode === 'mgmt-net') {
           actualTargetNode = `mgmt-net:${targetIface}`;
-        } else if (targetNode.startsWith('macvlan:')) {
+        } else if (targetNode.startsWith('macvlan:') || targetNode.startsWith('vxlan:') || targetNode.startsWith('vxlan-stitch:') || targetNode.startsWith('dummy:')) {
           actualTargetNode = targetNode;
         }
 
-        const sourceContainerName = (sourceNode === 'host' || sourceNode === 'mgmt-net' || sourceNode.startsWith('macvlan:'))
+        const sourceContainerName = (sourceNode === 'host' || sourceNode === 'mgmt-net' || sourceNode.startsWith('macvlan:') || sourceNode.startsWith('vxlan:') || sourceNode.startsWith('vxlan-stitch:') || sourceNode.startsWith('dummy:'))
           ? actualSourceNode
           : (fullPrefix ? `${fullPrefix}-${sourceNode}` : sourceNode);
-        const targetContainerName = (targetNode === 'host' || targetNode === 'mgmt-net' || targetNode.startsWith('macvlan:'))
+        const targetContainerName = (targetNode === 'host' || targetNode === 'mgmt-net' || targetNode.startsWith('macvlan:') || targetNode.startsWith('vxlan:') || targetNode.startsWith('vxlan-stitch:') || targetNode.startsWith('dummy:'))
           ? actualTargetNode
           : (fullPrefix ? `${fullPrefix}-${targetNode}` : targetNode);
         // Get interface data (might be undefined in editor mode)
@@ -766,7 +865,7 @@ export class TopoViewerAdaptorClab {
 
         // Only apply link state colors in viewer mode (when includeContainerData is true)
         if (opts.includeContainerData) {
-          // Check if either node is a special network endpoint (bridge, host, mgmt-net, macvlan)
+          // Check if either node is a special network endpoint (bridge, host, mgmt-net, macvlan, vxlan, dummy)
           const sourceNodeData = parsed.topology.nodes?.[sourceNode];
           const targetNodeData = parsed.topology.nodes?.[targetNode];
 
@@ -776,14 +875,20 @@ export class TopoViewerAdaptorClab {
             sourceNodeData?.kind === 'ovs-bridge' ||
             sourceNode === 'host' ||
             sourceNode === 'mgmt-net' ||
-            sourceNode.startsWith('macvlan:');
+            sourceNode.startsWith('macvlan:') ||
+            sourceNode.startsWith('vxlan:') ||
+            sourceNode.startsWith('vxlan-stitch:') ||
+            sourceNode.startsWith('dummy:');
 
           const targetIsSpecial =
             targetNodeData?.kind === 'bridge' ||
             targetNodeData?.kind === 'ovs-bridge' ||
             targetNode === 'host' ||
             targetNode === 'mgmt-net' ||
-            targetNode.startsWith('macvlan:');
+            targetNode.startsWith('macvlan:') ||
+            targetNode.startsWith('vxlan:') ||
+            targetNode.startsWith('vxlan-stitch:') ||
+            targetNode.startsWith('dummy:');
 
           if (sourceIsSpecial || targetIsSpecial) {
             // For special network connections, only check the non-special side
@@ -820,8 +925,10 @@ export class TopoViewerAdaptorClab {
             name: edgeId,
             parent: '',
             topoViewerRole: 'link',
-            sourceEndpoint: (sourceNode === 'host' || sourceNode === 'mgmt-net' || sourceNode.startsWith('macvlan:')) ? '' : sourceIface,
-            targetEndpoint: (targetNode === 'host' || targetNode === 'mgmt-net' || targetNode.startsWith('macvlan:')) ? '' : targetIface,
+            yamlProvenance,
+            yamlLinkType,
+            sourceEndpoint: (sourceNode === 'host' || sourceNode === 'mgmt-net' || sourceNode.startsWith('macvlan:') || sourceNode.startsWith('vxlan:') || sourceNode.startsWith('vxlan-stitch:') || sourceNode.startsWith('dummy:')) ? '' : sourceIface,
+            targetEndpoint: (targetNode === 'host' || targetNode === 'mgmt-net' || targetNode.startsWith('macvlan:') || targetNode.startsWith('vxlan:') || targetNode.startsWith('vxlan-stitch:') || targetNode.startsWith('dummy:')) ? '' : targetIface,
             lat: '',
             lng: '',
             source: actualSourceNode,

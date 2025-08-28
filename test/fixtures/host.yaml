@@ -1,0 +1,11 @@
+name: host-link
+topology:
+  nodes:
+    n1: { kind: linux }
+  links:
+    - type: host
+      endpoint:
+        node: n1
+        interface: eth2
+      host-interface: tap0
+

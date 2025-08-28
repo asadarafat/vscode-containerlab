@@ -12,12 +12,99 @@ export interface ClabNode {
     labels?: Record<string, any>;
 }
 
-/**
- * Represents a Containerlab link definition as specified in the YAML configuration.
- */
-export interface ClabLink {
+// Short-form link (existing format)
+export interface ClabLinkShort {
     endpoints: [string, string];
 }
+
+// Extended link endpoint object
+export interface ClabLinkEndpointObj {
+    node: string;
+    interface: string;
+    mac?: string;
+}
+
+// Extended veth
+export interface LinkTypeVeth {
+    type: 'veth';
+    endpoints: [ClabLinkEndpointObj, ClabLinkEndpointObj];
+    mtu?: number;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+// Extended mgmt-net
+export interface LinkTypeMgmtNet {
+    type: 'mgmt-net';
+    endpoint: ClabLinkEndpointObj;
+    'host-interface': string;
+    mtu?: number;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+// Extended macvlan
+export interface LinkTypeMacvlan {
+    type: 'macvlan';
+    endpoint: ClabLinkEndpointObj;
+    'host-interface': string;
+    mode?: string;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+// Extended host
+export interface LinkTypeHost {
+    type: 'host';
+    endpoint: ClabLinkEndpointObj;
+    'host-interface': string;
+    mtu?: number;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+// Extended vxlan
+export interface LinkTypeVxlan {
+    type: 'vxlan';
+    endpoint: ClabLinkEndpointObj;
+    remote: string; // ipv4/ipv6
+    vni: number;
+    'udp-port': number;
+    mtu?: number;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+// Extended vxlan-stitched (schema uses "vxlan-stitch")
+export interface LinkTypeVxlanStitched {
+    type: 'vxlan-stitch';
+    endpoint: ClabLinkEndpointObj;
+    remote: string;
+    vni: number;
+    'udp-port': number;
+    mtu?: number;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+// Extended dummy
+export interface LinkTypeDummy {
+    type: 'dummy';
+    endpoint: ClabLinkEndpointObj;
+    mtu?: number;
+    vars?: Record<string, any>;
+    labels?: Record<string, any>;
+}
+
+export type ClabLink =
+    | ClabLinkShort
+    | LinkTypeVeth
+    | LinkTypeMgmtNet
+    | LinkTypeMacvlan
+    | LinkTypeHost
+    | LinkTypeVxlan
+    | LinkTypeVxlanStitched
+    | LinkTypeDummy;
 
 /**
  * Represents the main Containerlab topology structure as defined in the YAML configuration.
@@ -30,7 +117,8 @@ export interface ClabTopology {
         kinds?: Record<string, ClabNode>;
         groups?: Record<string, ClabNode>;
         nodes?: Record<string, ClabNode>;
-        links?: ClabLink[];
+        // Keep broad typing to avoid breaking existing code paths that expect short-form only
+        links?: any[];
     };
 }
 
@@ -80,4 +168,3 @@ export interface EnvironmentJson {
 //     data: { id: string };
 //     position: { x: number; y: number };
 //   }
-

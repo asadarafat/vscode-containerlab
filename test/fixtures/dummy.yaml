@@ -1,0 +1,10 @@
+name: dummy-link
+topology:
+  nodes:
+    n1: { kind: linux }
+  links:
+    - type: dummy
+      endpoint:
+        node: n1
+        interface: eth5
+

@@ -1,0 +1,13 @@
+name: vxlan-stitched-link
+topology:
+  nodes:
+    n1: { kind: linux }
+  links:
+    - type: vxlan-stitch
+      endpoint:
+        node: n1
+        interface: eth4
+      remote: 198.51.100.20
+      vni: 2002
+      udp-port: 8472
+

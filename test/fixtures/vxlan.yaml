@@ -1,0 +1,13 @@
+name: vxlan-link
+topology:
+  nodes:
+    n1: { kind: linux }
+  links:
+    - type: vxlan
+      endpoint:
+        node: n1
+        interface: eth3
+      remote: 192.0.2.10
+      vni: 1001
+      udp-port: 4789
+

@@ -1,0 +1,8 @@
+name: veth-short
+topology:
+  nodes:
+    n1: { kind: linux }
+    n2: { kind: linux }
+  links:
+    - endpoints: [ "n1:eth1", "n2:eth1" ]
+
