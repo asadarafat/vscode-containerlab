@@ -218,29 +218,6 @@
     box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
   }
 
-  .dropdown-button {
-    padding: 0.5rem 0.75rem;
-    font-size: var(--vscode-font-size);
-    border-radius: 0.25rem;
-    display: inline-flex;
-    align-items: center;
-    background-color: var(
-      --vscode-dropdown-background,
-      var(--vscode-editor-background)
-    );
-    color: var(
-      --vscode-dropdown-foreground,
-      var(--text-primary)
-    );
-  }
-
-  .dropdown-button:hover {
-    background-color: var(
-      --vscode-list-hoverBackground,
-      var(--bg-hover)
-    );
-  }
-
   .dropdown-item {
     color: var(
       --vscode-dropdown-foreground,
@@ -309,17 +286,7 @@
     overflow: auto;
   }
   
-  /* Loading spinner */
-  .loading-spinner {
-    border-color: var(--vscode-progressBar-background);
-    border-top-color: var(--accent);
-    display: inline-block;
-    width: 2rem;
-    height: 2rem;
-    border-width: 4px;
-    border-radius: 9999px;
-    animation: spin 1s linear infinite;
-  }
+  
   
   /* Navbar styles */
   .navbar {
@@ -343,76 +310,7 @@
     gap: 0.75rem;
   }
   
-  .navbar-end {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-  }
   
-  /* Column utilities */
-  .column {
-    background-color: var(--vscode-panel-background);
-    flex: 1 1 0%;
-  }
-  
-  .columns {
-    display: flex;
-    flex-wrap: wrap;
-    margin-left: -0.5rem;
-    margin-right: -0.5rem;
-  }
-  
-  .columns > * {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-  }
-  
-  /* Size utilities matching Bulma */
-  .is-size-7 {
-    font-size: 0.75rem;
-  }
-  
-  .is-size-6 {
-    font-size: 0.875rem;
-  }
-  
-  .is-size-5 {
-    font-size: 1rem;
-  }
-  
-  .is-size-4 {
-    font-size: 1.125rem;
-  }
-  
-  /* Visibility utilities */
-  .is-hidden {
-    display: none;
-  }
-  
-  /* Flex utilities matching Bulma */
-  .is-flex {
-    display: flex;
-  }
-  
-  .is-flex-direction-column {
-    flex-direction: column;
-  }
-  
-  .is-justify-content-space-between {
-    justify-content: space-between;
-  }
-  
-  .is-justify-content-center {
-    justify-content: center;
-  }
-  
-  .is-justify-content-flex-end {
-    justify-content: flex-end;
-  }
-  
-  .is-align-items-center {
-    align-items: center;
-  }
 
   /* Migrated from style.css */
   .panel-overlay {
@@ -423,9 +321,7 @@
     box-shadow: 0 20px 25px rgba(0,0,0,0.1);
   }
 
-  .navbar-element-4a {
-    background-color: var(--vscode-titleBar-activeBackground);
-  }
+  
 
   .ViewPortDrawer {
     background-color: var(--vscode-panel-background);
@@ -433,16 +329,7 @@
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
   }
 
-  .box {
-    background-color: var(--vscode-panel-background);
-    border: 1px solid var(--vscode-panel-border);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  }
-
-  .panel-tabContainer {
-    background-color: var(--vscode-panel-background);
-    padding: 0;
-  }
+  
 
   .loading {
     position: absolute;
@@ -468,55 +355,9 @@
   }
 }
 
-/* Custom utility classes */
-@layer utilities {
+  /* Custom utility classes */
+  @layer utilities {
   /* Text utilities */
-  .has-text-weight-normal {
-    font-weight: 400;
-  }
-  
-  .has-text-weight-medium {
-    font-weight: 500;
-  }
-  
-  .has-text-weight-semibold {
-    font-weight: 600;
-  }
-  
-  .has-text-weight-bold {
-    font-weight: 700;
-  }
-  
-  .has-text-weight-light {
-    font-weight: 300;
-  }
-  
-  .has-text-white {
-    color: #ffffff;
-  }
-  
-  .has-text-left {
-    text-align: left;
-  }
-  
-  .has-text-right {
-    text-align: right;
-  }
-  
-  .has-text-center {
-    text-align: center;
-  }
-  
-  /* Background utilities */
-  .has-background-4a {
-    background-color: var(--vscode-titleBar-activeBackground);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  }
-  
-  /* Unselectable text */
-  .is-unselectable {
-    user-select: none;
-  }
 
   /* Prevent text selection on body by default - only allow in specific areas */
   body {
@@ -534,25 +375,7 @@
     -ms-user-select: text;
   }
   
-  /* Field utilities */
-  .field {
-    margin-bottom: 1rem;
-  }
   
-  .control {
-    position: relative;
-  }
-  
-  .has-icons-left .icon {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-  }
-  
-  .has-icons-left .input-field {
-    padding-left: 2.5rem;
-  }
 
   /* Link utilities */
   .link {
@@ -572,11 +395,7 @@
   }
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* (removed) keyframes 'spin' was only used by deleted .loading-spinner */
 
 /* Override cytoscape default styles for VSCode theme */
 #cy {
