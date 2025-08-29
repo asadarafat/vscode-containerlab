@@ -218,19 +218,23 @@ export async function saveViewport({
       // If extended mode and exactly one side is special, prepare an extended key
       const extCandidate = (linkSaveFormat === 'extended') && (isSrcSpecial !== isTgtSpecial);
       const buildExtKeyFromVals = (kind: string, hostIf: string, nodeName: string, iface: string) => `ext:${kind}|${hostIf}|${nodeName}|${iface}`;
-      const parseSpecial = (id: string): { kind: string; hostIf: string } | null => {
-        const kinds = ['host', 'mgmt-net', 'macvlan'];
+      const special = extCandidate ? ((): { kind: string; hostIf?: string } | null => {
+        const sid = isSrcSpecial ? srcId : tgtId;
+        const kinds = ['host', 'mgmt-net', 'macvlan', 'bridge', 'ovs-bridge'];
         for (const k of kinds) {
-          if (id.startsWith(`${k}:`)) {
-            return { kind: k, hostIf: id.substring(k.length + 1) };
+          if (sid.startsWith(`${k}:`)) {
+            const suffix = sid.substring(k.length + 1);
+            // For host/mgmt-net/macvlan we expose host-interface; for bridge kinds we do not
+            return (k === 'host' || k === 'mgmt-net' || k === 'macvlan') ? { kind: k, hostIf: suffix } : { kind: k };
           }
         }
         return null;
-      };
-      const special = extCandidate ? parseSpecial(isSrcSpecial ? srcId : tgtId) : null;
+      })() : null;
       const contNode = isSrcSpecial ? tgtId : srcId;
       const contIf = isSrcSpecial ? tgtEp : srcEp;
-      const desiredExtKey = (special && contNode && contIf) ? buildExtKeyFromVals(special.kind, special.hostIf, contNode, contIf) : '';
+      const desiredExtKey = (special && special.hostIf && contNode && contIf)
+        ? buildExtKeyFromVals(special.kind, special.hostIf, contNode, contIf)
+        : '';
 
       // Scan existing links to avoid duplicates (both flat and extended)
       let linkFound = false;
@@ -256,6 +260,29 @@ export async function saveViewport({
               break;
             }
           }
+          // Also detect existing veth extended with same endpoints
+          if (special && (special.kind === 'bridge' || special.kind === 'ovs-bridge')) {
+            const t = String(((linkItem as YAML.YAMLMap).get('type', true) as any)?.value ?? ((linkItem as YAML.YAMLMap).get('type', true) as any) ?? '');
+            if (t === 'veth') {
+              const eps = (linkItem as YAML.YAMLMap).get('endpoints', true);
+              if (YAML.isSeq(eps) && eps.items.length === 2) {
+                const take = (it: any) => {
+                  if (YAML.isMap(it)) {
+                    const m = it as YAML.YAMLMap;
+                    const n = String((m.get('node', true) as any)?.value ?? m.get('node', true) ?? '');
+                    const i = String((m.get('interface', true) as any)?.value ?? m.get('interface', true) ?? '');
+                    return { n, i };
+                  }
+                  return { n: '', i: '' };
+                };
+                const a = take(eps.items[0]);
+                const b = take(eps.items[1]);
+                const match = (a.n === srcId && a.i === srcEp && b.n === tgtId && b.i === tgtEp) ||
+                              (a.n === tgtId && a.i === tgtEp && b.n === srcId && b.i === srcEp);
+                if (match) { linkFound = true; break; }
+              }
+            }
+          }
         } else {
           // Short-form entry
           const eps = linkItem.get('endpoints', true);
@@ -275,15 +302,30 @@ export async function saveViewport({
 
       // Add either extended or flat, depending on mode and candidate
       if (extCandidate && special && contNode && contIf) {
-        const m = new YAML.YAMLMap();
-        m.flow = false;
-        m.set('type', doc!.createNode(special.kind));
-        m.set('host-interface', doc!.createNode(special.hostIf));
-        const epMap = new YAML.YAMLMap();
-        epMap.set('node', doc!.createNode(contNode));
-        epMap.set('interface', doc!.createNode(contIf));
-        m.set('endpoint', epMap);
-        linksNode.add(m);
+        if (special.kind === 'host' || special.kind === 'mgmt-net' || special.kind === 'macvlan') {
+          const m = new YAML.YAMLMap();
+          m.flow = false;
+          m.set('type', doc!.createNode(special.kind));
+          m.set('host-interface', doc!.createNode(special.hostIf || ''));
+          const epMap = new YAML.YAMLMap();
+          epMap.set('node', doc!.createNode(contNode));
+          epMap.set('interface', doc!.createNode(contIf));
+          m.set('endpoint', epMap);
+          linksNode.add(m);
+        } else if (special.kind === 'bridge' || special.kind === 'ovs-bridge') {
+          // Save as veth extended with object endpoints for bridge/ovs-bridge ↔ device
+          const m = new YAML.YAMLMap();
+          m.flow = false;
+          m.set('type', doc!.createNode('veth'));
+          const epsSeq = new YAML.YAMLSeq();
+          epsSeq.flow = false;
+          const makeEp = (n: string, i: string) => { const map = new YAML.YAMLMap(); map.set('node', doc!.createNode(n)); map.set('interface', doc!.createNode(i)); return map; };
+          const first = isSrcSpecial ? makeEp(srcId, srcEp) : makeEp(tgtId, tgtEp);
+          const second = isSrcSpecial ? makeEp(tgtId, tgtEp) : makeEp(srcId, srcEp);
+          epsSeq.add(first); epsSeq.add(second);
+          m.set('endpoints', epsSeq);
+          linksNode.add(m);
+        }
       } else {
         const newLink = new YAML.YAMLMap();
         newLink.flow = false;
