@@ -694,11 +694,13 @@ topology:
 
         case 'topo-editor-viewport-save': {
           try {
+            const linkSaveFormat = vscode.workspace.getConfiguration('containerlab.editor').get<'flat' | 'extended'>('linkSaveFormat', 'flat');
             await saveViewport({
               adaptor: this.adaptor,
               yamlFilePath: this.lastYamlFilePath,
                 payload: payload as string,
                 mode: 'edit',
+                linkSaveFormat,
                 setInternalUpdate: v => {
                   this.isInternalUpdate = v;
                 },
@@ -714,11 +716,13 @@ topology:
 
           case 'topo-editor-viewport-save-suppress-notification': {
             try {
+              const linkSaveFormat = vscode.workspace.getConfiguration('containerlab.editor').get<'flat' | 'extended'>('linkSaveFormat', 'flat');
               await saveViewport({
                 adaptor: this.adaptor,
                 yamlFilePath: this.lastYamlFilePath,
                 payload: payload as string,
                 mode: 'edit',
+                linkSaveFormat,
                 setInternalUpdate: v => {
                   this.isInternalUpdate = v;
                 },

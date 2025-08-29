@@ -1320,6 +1320,12 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "When enabled, changing a node's kind updates connected link endpoints to match the new kind's interface pattern."
+        },
+        "containerlab.editor.linkSaveFormat": {
+          "type": "string",
+          "enum": ["flat", "extended"],
+          "default": "flat",
+          "markdownDescription": "Format used when saving links from the TopoViewer editor. 'flat' writes short-form endpoints; 'extended' writes typed entries for special networks (host, mgmt-net, macvlan) when possible."
         }
       }
     }

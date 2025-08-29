@@ -484,7 +484,8 @@ class TopologyWebviewController {
     };
 
     this.eh = (this.cy as any).edgehandles(edgehandlesOptions);
-    this.eh.enable();
+    // Keep edgehandles disabled by default to avoid accidental edge creation during drag/move
+    this.eh.disable();
     this.isEdgeHandlerActive = false;
   }
 
@@ -611,8 +612,9 @@ class TopologyWebviewController {
                           <span>Add Link</span>
                         </div>`,
               select: (ele: cytoscape.Singular) => {
-                // initiate edgehandles drawing from this node
+                // Enable edge drawing explicitly, then start; disable on completion/cancel
                 self.isEdgeHandlerActive = true;
+                self.eh.enable();
                 self.eh.start(ele);
               }
             }
@@ -1239,10 +1241,12 @@ class TopologyWebviewController {
 
       this.cy.on('ehstop', () => {
         this.isEdgeHandlerActive = false;
+        this.eh?.disable();
       });
 
       this.cy.on('ehcancel', () => {
         this.isEdgeHandlerActive = false;
+        this.eh?.disable();
       });
 
       document.addEventListener('keydown', (event) => {
@@ -1281,6 +1285,7 @@ class TopologyWebviewController {
 
         setTimeout(() => {
           this.isEdgeHandlerActive = false;
+          this.eh?.disable();
         }, 100);
 
         const sourceEndpoint = this.getNextEndpoint(sourceNode.id());

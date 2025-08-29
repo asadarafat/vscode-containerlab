@@ -32,6 +32,7 @@ export interface SaveViewportParams {
   yamlFilePath: string;
   payload: string;
   adaptor?: TopoViewerAdaptorClab;
+  linkSaveFormat?: 'flat' | 'extended';
   setInternalUpdate?: (_arg: boolean) => void; // eslint-disable-line no-unused-vars
 }
 
@@ -41,6 +42,7 @@ export async function saveViewport({
   payload,
   adaptor,
   setInternalUpdate,
+  linkSaveFormat = 'flat',
 }: SaveViewportParams): Promise<void> {
   const payloadParsed: any[] = JSON.parse(payload);
   let doc: YAML.Document.Parsed | undefined;
@@ -204,14 +206,58 @@ export async function saveViewport({
     payloadParsed.filter(el => el.group === 'edges').forEach(element => {
       const data = element.data;
       const endpointsStr = computeEndpointsStr(data);
-      if (!endpointsStr) {
-        return;
-      }
+      if (!endpointsStr) return;
+
+      const srcId: string = data.source;
+      const tgtId: string = data.target;
+      const srcEp: string = data.sourceEndpoint || '';
+      const tgtEp: string = data.targetEndpoint || '';
+      const isSrcSpecial = isSpecialEndpoint(srcId);
+      const isTgtSpecial = isSpecialEndpoint(tgtId);
+
+      // If extended mode and exactly one side is special, prepare an extended key
+      const extCandidate = (linkSaveFormat === 'extended') && (isSrcSpecial !== isTgtSpecial);
+      const buildExtKeyFromVals = (kind: string, hostIf: string, nodeName: string, iface: string) => `ext:${kind}|${hostIf}|${nodeName}|${iface}`;
+      const parseSpecial = (id: string): { kind: string; hostIf: string } | null => {
+        const kinds = ['host', 'mgmt-net', 'macvlan'];
+        for (const k of kinds) {
+          if (id.startsWith(`${k}:`)) {
+            return { kind: k, hostIf: id.substring(k.length + 1) };
+          }
+        }
+        return null;
+      };
+      const special = extCandidate ? parseSpecial(isSrcSpecial ? srcId : tgtId) : null;
+      const contNode = isSrcSpecial ? tgtId : srcId;
+      const contIf = isSrcSpecial ? tgtEp : srcEp;
+      const desiredExtKey = (special && contNode && contIf) ? buildExtKeyFromVals(special.kind, special.hostIf, contNode, contIf) : '';
+
+      // Scan existing links to avoid duplicates (both flat and extended)
       let linkFound = false;
       for (const linkItem of linksNode.items) {
-        if (YAML.isMap(linkItem)) {
-          // Ensure each link map uses block style (no `{}`)
-          (linkItem as YAML.YAMLMap).flow = false;
+        if (!YAML.isMap(linkItem)) continue;
+        (linkItem as YAML.YAMLMap).flow = false; // normalize style
+        if ((linkItem as YAML.YAMLMap).has('type')) {
+          // Extended entry
+          if (desiredExtKey) {
+            const t = String(((linkItem as YAML.YAMLMap).get('type', true) as any)?.value ?? ((linkItem as YAML.YAMLMap).get('type', true) as any) ?? '');
+            const hi = String(((linkItem as YAML.YAMLMap).get('host-interface', true) as any)?.value ?? ((linkItem as YAML.YAMLMap).get('host-interface', true) as any) ?? '');
+            const epNode = (linkItem as YAML.YAMLMap).get('endpoint', true);
+            let epNodeName = '';
+            let epIface = '';
+            if (YAML.isMap(epNode)) {
+              const epMap = epNode as YAML.YAMLMap;
+              epNodeName = String((epMap.get('node', true) as any)?.value ?? epMap.get('node', true) ?? '');
+              epIface = String((epMap.get('interface', true) as any)?.value ?? epMap.get('interface', true) ?? '');
+            }
+            const key = buildExtKeyFromVals(t, hi, epNodeName, epIface);
+            if (key === desiredExtKey) {
+              linkFound = true;
+              break;
+            }
+          }
+        } else {
+          // Short-form entry
           const eps = linkItem.get('endpoints', true);
           if (YAML.isSeq(eps)) {
             const yamlEndpointsStr = eps.items
@@ -224,14 +270,25 @@ export async function saveViewport({
           }
         }
       }
-      if (!linkFound) {
-        const endpointsArrStr = endpointsStr;
+
+      if (linkFound) return;
+
+      // Add either extended or flat, depending on mode and candidate
+      if (extCandidate && special && contNode && contIf) {
+        const m = new YAML.YAMLMap();
+        m.flow = false;
+        m.set('type', doc!.createNode(special.kind));
+        m.set('host-interface', doc!.createNode(special.hostIf));
+        const epMap = new YAML.YAMLMap();
+        epMap.set('node', doc!.createNode(contNode));
+        epMap.set('interface', doc!.createNode(contIf));
+        m.set('endpoint', epMap);
+        linksNode.add(m);
+      } else {
         const newLink = new YAML.YAMLMap();
-        // New link map should be block style
         newLink.flow = false;
-        const endpoints = endpointsArrStr.split(',');
+        const endpoints = endpointsStr.split(',');
         const endpointsNode = doc.createNode(endpoints) as YAML.YAMLSeq;
-        // Endpoints list should be inline with []
         endpointsNode.flow = true;
         newLink.set('endpoints', endpointsNode);
         linksNode.add(newLink);
@@ -244,10 +301,26 @@ export async function saveViewport({
         .map(el => computeEndpointsStr(el.data))
         .filter((s): s is string => Boolean(s))
     );
+    // Track special cloud nodes present in the viewport (e.g., host:eth1, mgmt-net:mgmt1, macvlan:net1)
+    const payloadSpecialCloudIds = new Set(
+      payloadParsed
+        .filter(el => el.group === 'nodes' && el.data.topoViewerRole === 'cloud' && typeof el.data?.id === 'string' && isSpecialEndpoint(el.data.id))
+        .map(el => el.data.id as string)
+    );
     linksNode.items = linksNode.items.filter(linkItem => {
       if (YAML.isMap(linkItem)) {
-        // Preserve extended link entries (those having a 'type' key)
+        // Preserve or remove extended link entries based on presence of corresponding cloud node
         if ((linkItem as YAML.YAMLMap).has('type')) {
+          const typeVal = (linkItem as YAML.YAMLMap).get('type', true) as any;
+          const typeStr = String(typeVal?.value ?? typeVal ?? '');
+          if (typeStr === 'host' || typeStr === 'mgmt-net' || typeStr === 'macvlan') {
+            const hiVal = (linkItem as YAML.YAMLMap).get('host-interface', true) as any;
+            const hostIf = String(hiVal?.value ?? hiVal ?? '');
+            const specialId = `${typeStr}:${hostIf}`;
+            // Keep only if the corresponding special cloud node still exists in the viewport payload
+            return payloadSpecialCloudIds.has(specialId);
+          }
+          // For other extended types (vxlan, dummy, etc.), keep as-is
           return true;
         }
         const endpointsNode = linkItem.get('endpoints', true);
