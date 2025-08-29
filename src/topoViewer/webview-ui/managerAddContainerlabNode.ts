@@ -98,21 +98,34 @@ export class ManagerAddContainerlabNode {
     cy: cytoscape.Core,
     event: cytoscape.EventObject
   ): void {
-    const networkType = 'host';
+    // Default to host; type can be changed from the Network Properties panel
+    let networkType = 'host';
 
     // Determine next available host interface number (eth1, eth2, ...)
     const existingNodeIds = cy.nodes().map(node => node.id());
-    const hostRegex = new RegExp(`^${networkType}:eth(\\d+)$`);
-    const usedNumbers = existingNodeIds
-      .map(id => {
-        const match = id.match(hostRegex);
-        return match ? parseInt(match[1], 10) : null;
-      })
-      .filter((n): n is number => n !== null);
-    const nextInterface = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
-    const interfaceName = `eth${nextInterface}`;
+    const nextOrdinal = (prefixRegex: RegExp, base: number = 1) => {
+      const nums = existingNodeIds
+        .map(id => {
+          const m = id.match(prefixRegex);
+          return m ? parseInt(m[1], 10) : null;
+        })
+        .filter((n): n is number => n !== null);
+      return nums.length > 0 ? Math.max(...nums) + 1 : base;
+    };
 
-    const newNodeId = `${networkType}:${interfaceName}`;
+    let newNodeId = '';
+    let interfaceName = '';
+    if (networkType === 'host') {
+      const n = nextOrdinal(/^host:eth(\d+)$/);
+      interfaceName = `eth${n}`;
+      newNodeId = `host:${interfaceName}`;
+    } else {
+      // Fallback to host pattern
+      const n = nextOrdinal(/^host:eth(\d+)$/);
+      interfaceName = `eth${n}`;
+      newNodeId = `host:${interfaceName}`;
+      networkType = 'host';
+    }
 
     const newNodeData: NodeData = {
       id: newNodeId,

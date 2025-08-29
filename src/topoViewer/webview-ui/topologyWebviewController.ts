@@ -315,7 +315,7 @@ class TopologyWebviewController {
     }, 500);
 
     if (mode === 'edit') {
-      this.viewportPanels = new ManagerViewportPanels(this.saveManager, this.cy);
+      this.viewportPanels = new ManagerViewportPanels(this.saveManager, this.cy, this.messageSender);
     }
 
     // Initialize unified floating panel for both modes

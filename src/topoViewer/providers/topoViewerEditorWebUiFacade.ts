@@ -733,6 +733,26 @@ topology:
             break;
           }
 
+          case 'topo-editor-update-extended-link': {
+            try {
+              const update = JSON.parse(payload as string);
+              const { updateExtendedLink } = await import('../../topoViewer/utilities/updateExtendedLink');
+              await updateExtendedLink({
+                adaptor: this.adaptor,
+                yamlFilePath: this.lastYamlFilePath,
+                update,
+              });
+              // Refresh the panel to reflect updated cloud node labels
+              await this.updatePanelHtmlInternal(this.currentPanel);
+              result = `Extended link updated.`;
+              log.info(result);
+            } catch (innerError) {
+              error = `Error updating extended link: ${innerError}`;
+              log.error(`Error updating extended link: ${JSON.stringify(innerError, null, 2)}`);
+            }
+            break;
+          }
+
           case 'topo-editor-undo': {
             try {
               // Get the document for the YAML file

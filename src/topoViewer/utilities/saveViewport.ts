@@ -69,6 +69,7 @@ export async function saveViewport({
 
   const topoObj = mode === 'edit' ? (doc.toJS() as ClabTopology) : undefined;
 
+  // Regular (non-cloud, non-special-endpoint) nodes → persist/update under topology.nodes
   payloadParsed
     .filter(el => el.group === 'nodes'
       && el.data.topoViewerRole !== 'group'
@@ -137,18 +138,52 @@ export async function saveViewport({
     });
 
   if (mode === 'edit') {
+    // Bridge/OVS-bridge cloud nodes are special in the viewer, but materialize as nodes in YAML
+    const cloudBridgeNodes = payloadParsed.filter(el =>
+      el.group === 'nodes' && el.data.topoViewerRole === 'cloud' &&
+      (el.data?.extraData?.kind === 'bridge' || el.data?.extraData?.kind === 'ovs-bridge')
+    );
+    for (const cloud of cloudBridgeNodes) {
+      const nodeId: string = cloud.data.id;
+      let nodeYaml = yamlNodes.get(nodeId, true) as YAML.YAMLMap | undefined;
+      if (!nodeYaml) {
+        nodeYaml = new YAML.YAMLMap();
+        nodeYaml.flow = false;
+        yamlNodes.set(nodeId, nodeYaml);
+      }
+      const desiredKind = cloud.data?.extraData?.kind;
+      if (desiredKind) {
+        nodeYaml.set('kind', doc.createNode(desiredKind));
+      }
+    }
+
+    // Host cloud nodes are always treated as special and are NOT materialized as topology.nodes
+
     const payloadNodeIds = new Set(
       payloadParsed
-        .filter(el => el.group === 'nodes'
-          && el.data.topoViewerRole !== 'cloud'
-          && el.data.topoViewerRole !== 'freeText'
-          && !isSpecialEndpoint(el.data.id))
+        .filter(el => (
+            el.group === 'nodes' &&
+            el.data.topoViewerRole !== 'freeText' &&
+            // Include regular nodes and cloud bridges/ovs-bridges for add/remove tracking
+            ((el.data.topoViewerRole !== 'cloud' && !isSpecialEndpoint(el.data.id)) ||
+             (el.data.topoViewerRole === 'cloud' && (el.data?.extraData?.kind === 'bridge' || el.data?.extraData?.kind === 'ovs-bridge')))
+        ))
         .map(el => el.data.id)
     );
     for (const item of [...yamlNodes.items]) {
       const keyStr = String(item.key);
       if (!payloadNodeIds.has(keyStr) && ![...updatedKeys.values()].includes(keyStr)) {
-        yamlNodes.delete(item.key);
+        // Do not auto-delete legacy special nodes (host/bridge/ovs-bridge) from older YAMLs
+        const nodeVal = item.value;
+        let kindStr = '';
+        if (YAML.isMap(nodeVal)) {
+          const kindNode = (nodeVal as YAML.YAMLMap).get('kind', true) as any;
+          kindStr = String(kindNode?.value ?? kindNode ?? '');
+        }
+        const preserve = kindStr === 'host' || kindStr === 'bridge' || kindStr === 'ovs-bridge';
+        if (!preserve) {
+          yamlNodes.delete(item.key);
+        }
       }
     }
 
