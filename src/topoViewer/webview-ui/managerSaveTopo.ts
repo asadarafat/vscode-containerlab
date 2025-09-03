@@ -66,11 +66,9 @@ export class ManagerSaveTopo {
         const parentCollection = node.parent();
         const parentId: string = parentCollection.nonempty() ? parentCollection[0].id() : '';
         nodeJson.parent = parentId;
-        if (nodeJson.data?.extraData?.labels && parentId) {
-          const parts = parentId.split(':');
-          nodeJson.data.extraData.labels['graph-group'] = parts[0] || '';
-          nodeJson.data.extraData.labels['graph-level'] = parts[1] || '';
-
+        if (nodeJson.data?.extraData && parentId) {
+          // Do not write legacy graph-group/graph-level back into YAML labels.
+          // Grouping is persisted via annotations and parent id.
           const validLabelClasses = [
             'top-center',
             'top-left',

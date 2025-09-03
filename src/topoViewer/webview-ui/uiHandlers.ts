@@ -318,15 +318,8 @@ export async function viewportButtonsSaveTopo(): Promise<void> {
       if (parentId) {
         nodeJson.parent = parentId;
 
-        // Check if extraData and labels exist before modifying
-        if (nodeJson.data?.extraData?.labels) {
-          const parentParts = parentId.split(':');
-          if (parentParts.length >= 2) {
-            nodeJson.data.extraData.labels['graph-group'] = parentParts[0];
-            nodeJson.data.extraData.labels['graph-level'] = parentParts[1];
-          }
-
-          // Get label position from parent's classes
+        // Get label position from parent's classes; avoid writing legacy graph-group/graph-level
+        if (nodeJson.data?.extraData) {
           const validLabelClasses = [
             'top-center',
             'top-left',

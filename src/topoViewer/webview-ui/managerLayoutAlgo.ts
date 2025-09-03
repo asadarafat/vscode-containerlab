@@ -722,22 +722,11 @@ export class ManagerLayoutAlgo {
 
     this.applyGeoScale(false);
 
-    // Optionally start a Cola layout after disabling Geo mode, unless skipped
+    // Optionally apply a preset layout after disabling Geo mode, unless skipped
     if (!options?.skipPostLayout) {
-      try {
-        await loadExtension('cola');
-      } catch (err) {
-        log.error(`[GeoMap] Failed to load cola extension: ${err instanceof Error ? err.message : String(err)}`);
-      }
-
-      cy.layout({
-        name: 'cola',
-        nodeGap: 5,
-        edgeLength: 100,
-        animate: true,
-        randomize: false,
-        maxSimulationTime: 1500
-      } as any).run();
+      try { cy.stop(); } catch { /* ignore */ }
+      cy.layout({ name: 'preset' } as any).run();
+      try { cy.fit(); } catch { /* ignore */ }
     }
 
     const overlays = document.getElementsByClassName('viewport-geo-map');
@@ -775,7 +764,7 @@ export class ManagerLayoutAlgo {
         edgeLen * 100 / ((edge.data('weight') as number | undefined) || 1),
       animate: true,
       randomize: false,
-      maxSimulationTime: 1500
+      maxSimulationTime: 150
     } as any).run();
   }
 
@@ -815,7 +804,7 @@ export class ManagerLayoutAlgo {
       edgeSymDiffLength: 10,
       nodeDimensionsIncludeLabels: true,
       animate: true,
-      maxSimulationTime: 2000,
+      maxSimulationTime: 150,
       avoidOverlap: true
     } as any).run();
   }

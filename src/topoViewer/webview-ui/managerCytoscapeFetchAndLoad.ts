@@ -1,5 +1,6 @@
 // file: managerCytoscapeFetchAndLoad.ts
 import cytoscape from 'cytoscape';
+import { loadExtension } from '../cytoscapeInstanceFactory';
 import { VscodeMessageSender } from './managerVscodeWebview';
 import { log } from '../logging/logger';
 import { perfMark, perfMeasure } from '../utilities/performanceMonitor';
@@ -65,20 +66,29 @@ export async function fetchAndLoadData(cy: cytoscape.Core, messageSender: Vscode
 
     cy.add(elementsToAdd);
 
-    // Determine if all nodes overlap at the same position (e.g. when no annotations exist)
-    const nodes = elementsToAdd.filter((element: any) => element.group === 'nodes');
-    const allNodesOverlap =
-      nodes.length > 1 &&
-      nodes.every((element: any) => {
-        const pos = element.position;
-        const firstPos = nodes[0].position;
-        return (
-          pos &&
-          firstPos &&
-          pos.x === firstPos.x &&
-          pos.y === firstPos.y
-        );
+    // Determine if all nodes overlap at the same position (robustly using live cy positions)
+    // Using the live graph avoids shape mismatches in the JSON input (e.g., a node missing `position`).
+    const cyNodes = cy.nodes();
+    const allNodesOverlap = cyNodes.length > 1 && (() => {
+      const nodesArr = cyNodes.toArray().map(el => el as unknown as cytoscape.NodeSingular);
+      const firstPos = nodesArr[0].position();
+      const exactOverlap = nodesArr.every(n => {
+        const p = n.position();
+        return p.x === firstPos.x && p.y === firstPos.y;
       });
+      if (exactOverlap) return true;
+      // Fuzzy overlap: treat as overlapping if all nodes are within a small bounding box
+      const xs = nodesArr.map(n => n.position().x);
+      const ys = nodesArr.map(n => n.position().y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const width = maxX - minX;
+      const height = maxY - minY;
+      const nearThreshold = 25; // pixels
+      return width <= nearThreshold && height <= nearThreshold;
+    })();
 
     // Set all nodes to have an editor flag.
     cy.nodes().data('editor', 'true');
@@ -161,37 +171,50 @@ export async function fetchAndLoadData(cy: cytoscape.Core, messageSender: Vscode
       };
 
       scheduleLayout(() => {
-        // Extract node weights based on group levels for radial layout
-        const nodeWeights: Record<string, number> = {};
-        cy.nodes().forEach((node) => {
-          const level = parseInt(node.data('extraData')?.labels?.TopoViewerGroupLevel || '1', 10);
-          nodeWeights[node.id()] = 1 / level;
-        });
+        // Ensure this work does not block; load extension then run layout
+        (async () => {
+          try {
+            await loadExtension('cola');
+          } catch (e) {
+            log.error(`[Layout] Failed to load cola extension: ${e instanceof Error ? e.message : String(e)}`);
+          }
 
-        // Apply bezier curve style to edges for better visualization
-        cy.edges().forEach((edge) => {
-          edge.style({ 'curve-style': 'bezier', 'control-point-step-size': 20 });
-        });
+          // Extract node weights based on group levels for radial layout
+          const nodeWeights: Record<string, number> = {};
+          cy.nodes().forEach((node) => {
+            const level = parseInt(node.data('extraData')?.labels?.TopoViewerGroupLevel || '1', 10);
+            nodeWeights[node.id()] = 1 / level;
+          });
 
-        // Run improved layout in background
-        const improvedLayout = cy.layout({
-          name: 'cola',
-          fit: true,
-          nodeSpacing: 5,
-          edgeLength: (edge: cytoscape.EdgeSingular) => {
-            const s = nodeWeights[edge.source().id()] || 1;
-            const t = nodeWeights[edge.target().id()] || 1;
-            return 100 / (s + t);
-          },
-          edgeSymDiffLength: 10,
-          nodeDimensionsIncludeLabels: true,
-          animate: true,
-          animationDuration: 500,
-          maxSimulationTime: 1000,
-          avoidOverlap: true,
-          randomize: false
-        } as any);
-        improvedLayout.run();
+          // Apply bezier curve style to edges for better visualization
+          cy.edges().forEach((edge) => {
+            edge.style({ 'curve-style': 'bezier', 'control-point-step-size': 20 });
+          });
+
+          // Run improved layout in background
+          try {
+            const improvedLayout = cy.layout({
+              name: 'cola',
+              fit: true,
+              nodeSpacing: 5,
+              edgeLength: (edge: cytoscape.EdgeSingular) => {
+                const s = nodeWeights[edge.source().id()] || 1;
+                const t = nodeWeights[edge.target().id()] || 1;
+                return 100 / (s + t);
+              },
+              edgeSymDiffLength: 10,
+              nodeDimensionsIncludeLabels: true,
+              animate: true,
+              animationDuration: 500,
+              maxSimulationTime: 150,
+              avoidOverlap: true,
+              randomize: false
+            } as any);
+            improvedLayout.run();
+          } catch (e) {
+            log.error(`[Layout] Failed to run cola layout: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        })();
       });
     }
 
@@ -341,4 +364,3 @@ export async function fetchAndLoadDataEnvironment(keys: EnvironmentKeys[]): Prom
     throw error;
   }
 }
-
